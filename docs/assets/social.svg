@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <rect x="0" y="0" width="1280" height="8" fill="#1433d8"/>
+  <g font-family="Helvetica Neue,Helvetica,Arial,sans-serif">
+    <text x="96" y="230" font-size="104" font-weight="700" fill="#f5f5f7" letter-spacing="-3">olo-gate</text>
+    <text x="96" y="310" font-size="40" fill="#a1a1a6">A tiny guard for AI coding agents.</text>
+    <text x="96" y="372" font-size="30" fill="#6e7681">Asks before force pushes, rm -rf and deploys.</text>
+    <text x="96" y="414" font-size="30" fill="#6e7681">Shows what they would really do.</text>
+  </g>
+  <g font-family="Menlo,Consolas,monospace" font-size="26">
+    <rect x="96" y="470" width="1088" height="108" rx="14" fill="#161b22"/>
+    <text x="128" y="518" fill="#ff7b72" font-weight="700">HIGH  <tspan fill="#e6edf3" font-weight="400">Rewrites or deletes remote history: git push --force</tspan></text>
+    <text x="128" y="556" fill="#d29922">      Would erase 2 commits of origin/main</text>
+  </g>
+</svg>
