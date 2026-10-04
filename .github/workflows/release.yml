@@ -1,0 +1,51 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, name: linux-x86_64 }
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64 }
+          - { os: macos-latest, target: x86_64-apple-darwin, name: macos-x86_64, test: false }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup update stable && rustup target add ${{ matrix.target }}
+      - if: matrix.test != false
+        run: cargo test --release
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          mkdir dist
+          ext=""; [ "${{ matrix.os }}" = "windows-latest" ] && ext=".exe"
+          cp "target/${{ matrix.target }}/release/olo-gate$ext" dist/
+          cp LICENSE NOTICE README.md dist/
+          tar -czf "olo-gate-${{ matrix.name }}.tar.gz" -C dist .
+          (command -v sha256sum >/dev/null && sha256sum "olo-gate-${{ matrix.name }}.tar.gz" || shasum -a 256 "olo-gate-${{ matrix.name }}.tar.gz") > "olo-gate-${{ matrix.name }}.tar.gz.sha256"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: olo-gate-${{ matrix.name }}
+          path: olo-gate-${{ matrix.name }}.tar.gz*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes

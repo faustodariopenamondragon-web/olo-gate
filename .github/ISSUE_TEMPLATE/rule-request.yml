@@ -1,0 +1,20 @@
+name: Rule request (a miss)
+description: A risky command, file or tool that did NOT ask. If it can bypass the guard, report it privately instead (see SECURITY.md).
+labels: ["rule"]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: Command, file or tool
+      description: Remove any secret first.
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it risky?
+      description: What is lost or exposed, and can it be undone?
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: "olo-gate version" }
+    validations: { required: true }

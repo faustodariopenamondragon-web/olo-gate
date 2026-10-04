@@ -1,0 +1,32 @@
+[package]
+name = "olo-gate"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A tiny guard for AI coding agents: asks before git push --force, rm -rf, deploys and other irreversible actions, and shows their real effect."
+license = "Apache-2.0"
+repository = "https://github.com/faustodariopenamondragon-web/olo-gate"
+homepage = "https://www.olomni.com/en/guides/stop-an-ai-agent-from-force-pushing"
+readme = "README.md"
+keywords = ["ai-agents", "claude-code", "guardrails", "hooks", "safety"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [".github/", "docs/assets/"]
+
+[lib]
+name = "olo_gate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "olo-gate"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

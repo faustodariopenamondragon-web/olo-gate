@@ -1,0 +1,26 @@
+name: False positive
+description: A harmless command, file or tool asked for approval.
+labels: ["false-positive"]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: Command, file or tool
+      description: Remove any secret first. `olo-gate redact` can help.
+    validations: { required: true }
+  - type: textarea
+    id: shown
+    attributes:
+      label: What olo-gate said
+      description: Output of `olo-gate check <command>`.
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: "olo-gate version", description: "`olo-gate --version`" }
+    validations: { required: true }
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options: [Claude Code, Codex, Cursor, Gemini CLI, Other]
+    validations: { required: true }

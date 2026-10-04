@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability or bypass
+    url: https://github.com/faustodariopenamondragon-web/olo-gate/security/advisories/new
+    about: Please report privately, not in a public issue.
+  - name: Questions and ideas
+    url: https://github.com/faustodariopenamondragon-web/olo-gate/discussions
+    about: Ask how to set it up with your agent, or share an idea.

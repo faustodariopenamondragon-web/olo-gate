@@ -1,0 +1,20 @@
+name: Bug report
+description: Something other than a rule is wrong (crash, hang, wrong output format for an agent).
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Payloads and commands, without secrets.
+  - type: input
+    id: env
+    attributes:
+      label: "Version, OS and agent version"
+      placeholder: "olo-gate 0.1.0, macOS 15, Claude Code 2.x"
+    validations: { required: true }
