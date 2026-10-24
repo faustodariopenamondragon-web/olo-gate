@@ -29,11 +29,14 @@ pub struct Config {
     pub mode: Mode,
     /// Exact commands (after trimming) that are never questioned.
     pub allow: Vec<String>,
+    /// Commands that must NEVER run: blocked even if the person would approve them and even if olo-gate would not
+    /// otherwise recognise them as risky. An entry is a whole command or a prefix ending in `*`. Wins over `allow`.
+    pub deny: Vec<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { level: Level::High, mode: Mode::Ask, allow: vec![] }
+        Config { level: Level::High, mode: Mode::Ask, allow: vec![], deny: vec![] }
     }
 }
 
@@ -43,6 +46,8 @@ struct File {
     mode: Option<String>,
     #[serde(default)]
     allow: Vec<String>,
+    #[serde(default)]
+    deny: Vec<String>,
 }
 
 fn level_of(s: &str) -> Option<Level> {
@@ -87,6 +92,7 @@ impl Config {
                     c.mode = m;
                 }
                 c.allow = f.allow.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                c.deny = f.deny.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).take(200).collect();
             }
         }
         if let Some(l) = std::env::var("OLO_GATE_LEVEL").ok().as_deref().and_then(level_of) {

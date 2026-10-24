@@ -7,11 +7,16 @@ High risk always asks; medium asks only with `"level": "medium"`. The authoritat
 
 | Risk | Examples |
 | --- | --- |
-| **High** | `rm -rf`, `find … -delete`, `git push --force` / `-f` / `+ref` / `--delete`, `git reset --hard`, `git clean -fd`, `git branch -D`, `git rebase` / `filter-branch`, `sudo`, `curl … \| sh`, `irm … \| iex`, `npm|cargo|pnpm publish`, `docker system prune` / `push`, `kubectl delete|apply`, `terraform apply|destroy`, `vercel --prod`, `supabase db push`, `gh release create` / `repo delete`, `aws … rm|delete|terminate`, `chmod -R`, `dd of=/dev/…`, `mkfs`, SQL `DROP` / `TRUNCATE` / `DELETE` without `WHERE`, `redis-cli flushall`, `mail`, `curl -X DELETE`, `systemctl`/`launchctl` changes |
-| **Medium** | `git push`, `rm file`, `kill`, global installs, `brew|apt|pip install`, `chmod +x`, `curl -X POST|PUT|PATCH`, SQL `UPDATE`/`ALTER` |
+| **High** | `rm -rf`, `shred`, `ls \| xargs rm`, `find … -delete`, `git push --force` / `-f` / `+ref` / `:branch` / `--delete` (also through `git -C dir …`), `git reset --hard`, `git checkout -- .` / `git restore .` / `checkout -f`, `git clean -fd`, `git branch -D`, `git stash clear`, `git update-ref -d`, `git rebase` / `filter-branch`, `sudo`, `curl … \| sh`, `bash <(curl …)`, `sh -c "$(curl …)"`, `eval` of `base64` / `curl` output, `irm … \| iex`, `npm|cargo|pnpm publish`, `docker system prune` / `push` / `rm -f`, `kubectl delete|apply`, `terraform apply|destroy`, `ansible-playbook` (not with `--check`), `vercel --prod`, `supabase db push`, `gh release create` / `repo delete`, `aws … rm|delete|terminate`, `gsutil rm`, `rclone sync|purge|delete`, `rsync --delete*` / `--remove-source-files` (not with `--dry-run`), `chmod -R`, `dd of=/dev/…`, `mkfs`, SQL `DROP` / `TRUNCATE` / `DELETE` without `WHERE`, `dropdb`, `dropuser`, `pg_restore --clean`, `mongosh` `dropDatabase` / `deleteMany`, `redis-cli flushall`, `mail`, `curl -X DELETE`, `systemctl`/`launchctl` changes, `python -c` / `node -e` that `rmtree` / `rmSync` |
+| **High, on another machine** | a risky command run through `ssh host "…"`, `docker exec … …` or `kubectl exec … -- …` is judged as if it ran here, and is high: nothing there can be undone from here |
+| **High, sensitive places** | writing to `~/.ssh`, `/etc`, shell startup files or cloud credentials from the shell: `tee`, `cp`, `mv`, `install`, `> file`, `>> file` |
+| **Medium** | `git push`, `rm file`, `git checkout -- file`, `git stash drop`, `kill`, global installs, `brew|apt|pip install`, `chmod +x`, `curl -X POST|PUT|PATCH`, SQL `UPDATE`/`ALTER`, `truncate`, `: > file` / `> file` / `cat /dev/null > file` (emptying a file), `tar -x … -C /`, a command whose NAME is built at run time (`$(echo rm) -rf x`) |
 | *Ignored* | `ls`, `git status`/`diff`/`log`/`commit`, `npm test`/`run build`, `curl` reads, `cargo test`, `docker ps`/`build`, `kubectl get`, `terraform plan`, `echo "rm -rf /"` |
 
-Chains (`a && b`), wrappers (`env`, `nohup`, `time`, `xargs`), and `bash -c "…"` are looked through.
+Chains (`a && b`), wrappers (`env`, `nohup`, `time`, `xargs`, `busybox`), shell blocks (`if …; then …; fi`,
+`for …; do …; done`), aliases defined in the same command (`alias g=git; g push -f`) and `bash -c "…"` are looked
+through. A redirect that writes something (`echo hi > file`) is an ordinary write and is not questioned; only one
+that leaves the file blank is.
 
 ## File edits
 

@@ -57,11 +57,44 @@ pub fn reason(payload: &Value) -> Option<(Risk, String)> {
     Some((a.risk, text))
 }
 
+/// The `deny` entry that matches this payload's shell command, if any. An entry is a whole command or a prefix ending
+/// in `*`; it is compared with the command and with each piece of it, so `cd app && dropdb prod` and
+/// `sudo dropdb prod` are caught by `dropdb prod*`.
+pub fn denied_by(payload: &Value, cfg: &Config) -> Option<String> {
+    if cfg.deny.is_empty() {
+        return None;
+    }
+    let variants = rules::command_variants(&rules::shell_command(payload)?);
+    cfg.deny
+        .iter()
+        .find(|pat| {
+            let pat: String = pat.split_whitespace().collect::<Vec<_>>().join(" ");
+            match pat.strip_suffix('*') {
+                Some(prefix) => !prefix.trim().is_empty() && variants.iter().any(|v| v.starts_with(prefix)),
+                None => variants.contains(&pat),
+            }
+        })
+        .cloned()
+}
+
 /// The stdout the hook must print for this payload, or `None` to stay silent.
 pub fn decide(client: Client, payload: &Value, cfg: &Config) -> Option<String> {
     let ev = payload.get("hook_event_name").and_then(Value::as_str).unwrap_or("");
     if !is_pre_event(ev) {
         return None;
+    }
+    // The deny list is the person's "never": it blocks outright, whatever the mode, and beats `allow`.
+    if let Some(pat) = denied_by(payload, cfg) {
+        let why = format!("olo-gate: blocked by your deny list (\"{}\")", rules::redact(&pat));
+        let hint = format!("{why}. The person decided this command must never run: do not retry it or work around it; tell them instead.");
+        return Some(
+            match client {
+                Client::Claude | Client::Codex => json!({ "hookSpecificOutput": { "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": hint } }),
+                Client::Gemini => json!({ "decision": "deny", "reason": hint }),
+                Client::Cursor => json!({ "permission": "deny", "user_message": why, "agent_message": hint }),
+            }
+            .to_string(),
+        );
     }
     let verdict = rules::assess(payload)
         .filter(|a| a.risk == Risk::High || cfg.level == Level::Medium)
@@ -173,5 +206,62 @@ mod tests {
         let p = bash(&format!("curl -X DELETE -H 'Authorization: Bearer {FAKE}' https://api.example.com/items/1"));
         let v = out(Client::Claude, &p, &Config::default()).unwrap();
         assert!(!v.to_string().contains("sk-ABCDEF"));
+    }
+    fn deny_cfg(list: &[&str]) -> Config {
+        Config { deny: list.iter().map(|s| s.to_string()).collect(), ..Config::default() }
+    }
+
+    #[test]
+    fn the_deny_list_blocks_what_nothing_else_would_even_question() {
+        // `psql -c "select 1"` is harmless to olo-gate; the person said never against production.
+        let cfg = deny_cfg(&["psql -h prod*", "dropdb prod*"]);
+        for c in [
+            "psql -h prod.db.internal -c 'select 1'",
+            "dropdb production",
+            "cd app && dropdb prod",
+            "sudo dropdb prod_main",
+            "env X=1 dropdb prod",
+            "bash -c 'dropdb prod'",
+        ] {
+            let v = out(Client::Claude, &bash(c), &cfg).unwrap_or_else(|| panic!("{c}"));
+            assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "deny", "{c}");
+            assert!(v["hookSpecificOutput"]["permissionDecisionReason"].as_str().unwrap().contains("deny list"));
+        }
+        for c in ["psql -h localhost -c 'select 1'", "echo dropdb prod", "ls"] {
+            assert!(decide(Client::Claude, &bash(c), &cfg).is_none(), "{c}");
+        }
+        // Not on the list: the normal rules still ask about it, but it is not a deny-list block.
+        let v = out(Client::Claude, &bash("dropdb staging"), &cfg).unwrap();
+        assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "ask");
+    }
+
+    #[test]
+    fn deny_is_exact_without_a_star_beats_allow_and_ignores_the_mode() {
+        let exact = deny_cfg(&["npm publish"]);
+        assert!(decide(Client::Claude, &bash("npm publish"), &exact).is_some());
+        assert!(
+            decide(Client::Claude, &bash("npm publish --tag beta"), &exact).is_some_and(|s| !s.contains("deny list")),
+            "different command: normal rules apply"
+        );
+        let both = Config {
+            allow: vec!["npm publish".into()],
+            deny: vec!["npm publish".into()],
+            mode: Mode::Ask,
+            ..Config::default()
+        };
+        let v = out(Client::Claude, &bash("npm publish"), &both).unwrap();
+        assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "deny", "deny wins over allow, even in ask mode");
+        // The same everywhere an agent can be asked.
+        assert_eq!(out(Client::Gemini, &bash("npm publish"), &both).unwrap()["decision"], "deny");
+        assert_eq!(
+            out(Client::Cursor, &json!({ "hook_event_name": "beforeShellExecution", "command": "npm publish" }), &both)
+                .unwrap()["permission"],
+            "deny"
+        );
+        // A bare `*` or an empty entry must never match everything.
+        assert!(decide(Client::Claude, &bash("ls"), &deny_cfg(&["*", "", "  *"])).is_none());
+        // It only looks at shell commands.
+        let edit = json!({ "hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": { "file_path": "/tmp/dropdb prod" } });
+        assert!(decide(Client::Claude, &edit, &deny_cfg(&["dropdb prod*"])).is_none());
     }
 }

@@ -104,3 +104,29 @@ fn init_prints_valid_json_and_changes_nothing() {
         serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap();
     }
 }
+
+#[test]
+fn the_deny_list_blocks_even_what_the_person_would_approve() {
+    let dir = scratch("deny");
+    let cfg = dir.join("config.json");
+    std::fs::write(&cfg, r#"{"allow":["dropdb prod"],"deny":["dropdb prod*","psql -h prod*"]}"#).unwrap();
+    let run = |command: &str| -> Option<serde_json::Value> {
+        let payload = serde_json::json!({ "hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": { "command": command } });
+        let mut ch = bin()
+            .env("OLO_GATE_CONFIG", &cfg)
+            .args(["hook", "claude"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        ch.stdin.take().unwrap().write_all(payload.to_string().as_bytes()).unwrap();
+        let out = ch.wait_with_output().unwrap();
+        (!out.stdout.is_empty()).then(|| serde_json::from_slice(&out.stdout).unwrap())
+    };
+    for c in ["dropdb prod", "psql -h prod.db -c 'select 1'", "cd app && sudo dropdb prod_main"] {
+        let v = run(c).unwrap_or_else(|| panic!("{c}"));
+        assert_eq!(v["hookSpecificOutput"]["permissionDecision"], "deny", "{c}");
+    }
+    assert!(run("psql -h localhost -c 'select 1'").is_none());
+    let _ = std::fs::remove_dir_all(dir);
+}

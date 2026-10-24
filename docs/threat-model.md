@@ -31,8 +31,13 @@ away, and a single `git push --force` or `rm -rf` can cost days. olo-gate recogn
 
 ## Known limits
 
-- The shell tokenizer is deliberately small: it does not expand variables, globs, aliases, functions or
-  here-documents. `bash -c "…"` is parsed up to three levels deep.
+- The shell tokenizer is deliberately small: it does not expand variables, globs, functions or
+  here-documents, and only resolves aliases defined in the same command. `bash -c "…"` is parsed up to three
+  levels deep. Code built at run time (an `eval` of something assembled from pieces, a script the agent just wrote
+  and then runs) can still hide a destructive command: a denylist can never be complete. Use `deny` for the
+  commands you can name, and the agent's own sandbox for real isolation.
+- A command run on another machine (`ssh host "…"`) is judged by what it says, not by what that machine holds; the
+  effect preview is only computed for local git and `rm`.
 - Commands hidden in a file the agent writes and then executes are not seen at write time (only the
   later execution is).
 - Effect previews compare with what you last fetched; the server may have newer commits. The text says so.
